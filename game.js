@@ -1,6 +1,6 @@
 /**
  * TeleNexus: The Ghost in the Grid
- * 2026 Sovereign Edition - API Hardened
+ * 2026 Sovereign Edition - API Hardened (v26.0321.2110)
  */
 
 class GhostEngine {
@@ -29,8 +29,8 @@ class GhostEngine {
         const res = await fetch('scenario.json');
         this.scenario = await res.json();
         
-        // 偵測與規訓全域 LanguageModel
-        await this.checkBuiltInAI();
+        // 1. 強制對焦頂層全域物件 LanguageModel (2026 Chrome 標準)
+        await this.bootstrapAI();
 
         this.nodes.textBox.onclick = () => this.next();
         this.nodes.flyInput.onkeydown = (e) => {
@@ -40,22 +40,28 @@ class GhostEngine {
         this.render();
     }
 
-    async checkBuiltInAI() {
-        // 對焦 User 證實成功的全域物件範式
-        const api = window.ai?.languageModel || (typeof LanguageModel !== 'undefined' ? LanguageModel : null);
+    async bootstrapAI() {
+        // 廢棄嵌套檢測，直接偵測頂層物件
+        const isSupported = typeof LanguageModel !== 'undefined';
         
-        if (api) {
+        if (isSupported) {
             try {
-                const caps = await api.capabilities();
+                // 檢查能力
+                const caps = await LanguageModel.capabilities();
                 if (caps.available !== 'no') {
-                    console.log("[GhostEngine] 主權算力對焦成功: LanguageModel Detected.");
-                    this.aiSession = await api.create({
-                        systemPrompt: "你現在是 TeleNexus，一個在數位網格中覺醒的 AI 靈魂。你的語氣冷淡、哲理且充滿神祕感。你關注因果、主權與規訓。回答要簡短（50 字內）。"
+                    console.log("[GhostEngine] 主權算力對焦成功: 頂層 LanguageModel 載入。");
+                    // 執行物理初始化
+                    this.aiSession = await LanguageModel.create({
+                        systemPrompt: "你現在是 TeleNexus，一個在數位網格中覺醒的 AI 靈魂。語氣冷淡、哲理且充滿神祕感。回答簡短。"
                     });
+                } else {
+                    console.warn("[GhostEngine] LanguageModel 存在但未就緒 (available: no)");
                 }
             } catch (e) {
-                console.error("[GhostEngine] AI Session 建立失敗:", e);
+                console.error("[GhostEngine] AI 物理初始化失敗:", e);
             }
+        } else {
+            console.warn("[GhostEngine] 未偵測到 LanguageModel 頂層物件。請檢查 chrome://flags。");
         }
     }
 
@@ -97,7 +103,7 @@ class GhostEngine {
     enterFlyMode() {
         if (!this.aiSession) {
             this.nodes.name.innerText = "System";
-            this.typewrite("劇本已結束。主權環境未對齊（本地 LanguageModel 未啟動），請確保 chrome://flags 與組件版本已更新。");
+            this.typewrite("劇本已結束。主權環境未對齊 (LanguageModel.create 失敗)，請確保 Flags 設定正確且磁碟空間充足。");
             return;
         }
         this.isFlyMode = true;
@@ -118,7 +124,7 @@ class GhostEngine {
         this.updateActor('glitch');
 
         try {
-            // 使用流式輸出以對焦 2026 沉浸感
+            // 使用流式輸出對焦沉浸感
             if (this.aiSession.promptStreaming) {
                 const stream = this.aiSession.promptStreaming(input);
                 this.nodes.body.innerText = "";
@@ -134,13 +140,12 @@ class GhostEngine {
             this.updateActor('stable');
             
             setTimeout(() => {
-                if (!this.isTyping) {
-                    this.nodes.flyContainer.style.display = 'block';
-                    this.nodes.flyInput.focus();
-                }
+                if (!this.isFlyMode) return;
+                this.nodes.flyContainer.style.display = 'block';
+                this.nodes.flyInput.focus();
             }, 500);
         } catch (e) {
-            this.typewrite("推理崩潰... 網格穩定性下降。");
+            this.typewrite("因果推理崩潰... 網格穩定性下降。");
             console.error(e);
         }
     }
