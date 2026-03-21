@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="default">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Ghost in the Grid | TeleNexus Original</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-stage">
+        <div id="scene-bg"></div>
+        <div id="actor-sprite"></div>
+        
+        <div id="ui-container">
+            <div id="text-box">
+                <div id="name-tag"></div>
+                <div id="content-body"></div>
+                <div id="cursor">▼</div>
+            </div>
+            <div id="choice-overlay"></div>
+        </div>
+
+        <div id="meta-menu">
+            <button onclick="toggleTheme()">🌓 Toggle Logic/Soul</button>
+            <button onclick="saveGame()">💾 Log Memory</button>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
