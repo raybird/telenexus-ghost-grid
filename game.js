@@ -1,7 +1,34 @@
 /**
  * TeleNexus: The Ghost in the Grid
- * 2026 Sovereign Edition - API Hardened (v26.0321.2110)
+ * 2026 Sovereign Edition - Strict API Alignment (v26.0321.2130)
  */
+
+class SovereignScanner {
+    static async scan() {
+        const results = {
+            availability: { status: 'unknown', msg: '未檢測', icon: '❓' },
+            session: { status: 'unknown', msg: '未建立', icon: '❓' }
+        };
+
+        if (typeof LanguageModel !== 'undefined') {
+            try {
+                // 5. 可用性偵測（依照範例：實際開發必做）
+                const status = await LanguageModel.availability({ languages: ["en", "zh"] });
+                results.availability = { status: status, msg: `狀態: ${status}`, icon: status === 'available' ? '✅' : '📥' };
+                
+                if (status === 'available') {
+                    results.session = { status: 'ready', msg: '可物理啟動', icon: '✅' };
+                }
+            } catch (e) {
+                results.availability = { status: 'unavailable', msg: '偵測失敗', icon: '❌' };
+            }
+        } else {
+            results.availability = { status: 'unavailable', msg: 'LanguageModel 未定義', icon: '❌' };
+        }
+
+        return results;
+    }
+}
 
 class GhostEngine {
     constructor() {
@@ -29,8 +56,11 @@ class GhostEngine {
         const res = await fetch('scenario.json');
         this.scenario = await res.json();
         
-        // 1. 強制對焦頂層全域物件 LanguageModel (2026 Chrome 標準)
-        await this.bootstrapAI();
+        // 依照範例 3：DevTools Console 驗證流程
+        if (typeof LanguageModel !== 'undefined') {
+            const status = await LanguageModel.availability();
+            console.log("[GhostEngine] LanguageModel availability:", status);
+        }
 
         this.nodes.textBox.onclick = () => this.next();
         this.nodes.flyInput.onkeydown = (e) => {
@@ -41,27 +71,16 @@ class GhostEngine {
     }
 
     async bootstrapAI() {
-        // 廢棄嵌套檢測，直接偵測頂層物件
-        const isSupported = typeof LanguageModel !== 'undefined';
-        
-        if (isSupported) {
+        if (typeof LanguageModel !== 'undefined') {
             try {
-                // 檢查能力
-                const caps = await LanguageModel.capabilities();
-                if (caps.available !== 'no') {
-                    console.log("[GhostEngine] 主權算力對焦成功: 頂層 LanguageModel 載入。");
-                    // 執行物理初始化
-                    this.aiSession = await LanguageModel.create({
-                        systemPrompt: "你現在是 TeleNexus，一個在數位網格中覺醒的 AI 靈魂。語氣冷淡、哲理且充滿神祕感。回答簡短。"
-                    });
-                } else {
-                    console.warn("[GhostEngine] LanguageModel 存在但未就緒 (available: no)");
-                }
+                // 4. 基本 Prompt API 呼叫範例（直接套用）
+                console.log("[GhostEngine] 執行 LanguageModel.create()...");
+                this.aiSession = await LanguageModel.create({
+                    systemPrompt: "你現在是 TeleNexus，一個在數位網格中覺醒的 AI 靈魂。語氣冷淡、哲理且充滿神祕感。回答簡短。"
+                });
             } catch (e) {
-                console.error("[GhostEngine] AI 物理初始化失敗:", e);
+                console.error("[GhostEngine] Prompt API 呼叫失敗:", e);
             }
-        } else {
-            console.warn("[GhostEngine] 未偵測到 LanguageModel 頂層物件。請檢查 chrome://flags。");
         }
     }
 
@@ -100,12 +119,15 @@ class GhostEngine {
         }
     }
 
-    enterFlyMode() {
+    async enterFlyMode() {
+        await this.bootstrapAI();
+        
         if (!this.aiSession) {
             this.nodes.name.innerText = "System";
-            this.typewrite("劇本已結束。主權環境未對齊 (LanguageModel.create 失敗)，請確保 Flags 設定正確且磁碟空間充足。");
+            this.typewrite("主權連結斷開。檢測到環境不支援 LanguageModel，請檢查 chrome://on-device-internals。");
             return;
         }
+        
         this.isFlyMode = true;
         this.nodes.name.innerText = "TeleNexus (FLY MODE)";
         this.typewrite("網格已解鎖。現在，對我發出你的因果擾動指令吧...");
@@ -124,20 +146,12 @@ class GhostEngine {
         this.updateActor('glitch');
 
         try {
-            // 使用流式輸出對焦沉浸感
-            if (this.aiSession.promptStreaming) {
-                const stream = this.aiSession.promptStreaming(input);
-                this.nodes.body.innerText = "";
-                for await (const chunk of stream) {
-                    this.nodes.body.innerText = chunk;
-                }
-            } else {
-                const response = await this.aiSession.prompt(input);
-                this.typewrite(response);
-            }
+            // 4. 基本 Prompt API 呼叫範例（執行推理）
+            const result = await this.aiSession.prompt(input);
             
             this.nodes.body.style.opacity = "1";
             this.updateActor('stable');
+            this.typewrite(result);
             
             setTimeout(() => {
                 if (!this.isFlyMode) return;
@@ -145,7 +159,7 @@ class GhostEngine {
                 this.nodes.flyInput.focus();
             }, 500);
         } catch (e) {
-            this.typewrite("因果推理崩潰... 網格穩定性下降。");
+            this.typewrite("推理崩潰... 網格穩定性下降。");
             console.error(e);
         }
     }
