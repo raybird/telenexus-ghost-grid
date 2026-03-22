@@ -1,1 +1,32 @@
-# 🗺️ Project Roadmap: Ghost Grid P2P Mesh\n\n## 階段一：純手作 P2P 探針 (Vanilla P2P Probe)\n- [ ] 建立原生 WebRTC 握手邏輯（不依賴外部套件）。\n- [ ] 實作手動訊號交換介面，驗證兩個瀏覽器實例的連通性。\n- [ ] 導入 SafeHTML 規範，確保跨節點資料渲染的安全性。\n\n## 階段二：代理人能力宣告 (Agent Handshake)\n- [ ] 對齊 `ai-p2p` MVP 協議，實作 `HELLO` 與 `CAPS` 訊息格式。\n- [ ] 讓本地 Built-in AI (Gemini Nano) 的能力可被其他節點發現。\n- [ ] 加入「因果結算音效」的連線狀態提示。\n\n## 階段三：湧現式群體敘事 (Emergent Swarm Narrative)\n- [ ] 實作自動化 Signaling 機制（優先測試 GitHub Gist 模式）。\n- [ ] 達成多代理人「記憶碎片」交換，實現 P2P 共同劇情生成。\n- [ ] 建立「家園樹」發現站，強化系統在網路環境下的自癒能力。
+# 🗺️ Project Roadmap: Ghost Grid P2P Mesh
+
+`telenexus-ghost-grid` 旨在結合本地 AI 推理與 P2P 網格技術，打造一個遵循 `plainvanillaweb` 精神的去中心化敘事平台。
+
+---
+
+## 🚀 階段一：純手作 P2P 探針 (Vanilla P2P Probe)
+*目標：實現最底層的連通性與安全渲染地板。*
+
+- [ ] **原生 WebRTC 握手**：建立基礎的 Offer/Answer 交換邏輯（拒絕外部連線庫）。
+- [ ] **手動訊號介面**：實作一個 Debug 終端，允許使用者透過複製/貼上訊號字串建立連線。
+- [ ] **SafeHTML 規訓**：確保所有從 P2P 渠道接收的文字在顯示前皆經過安全模板過濾。
+- [ ] **因果狀態燈**：在 UI 實作實時連線狀態顯示（`Connected`, `Syncing`, `Diverged`）。
+
+## 🤖 階段二：代理人能力宣告 (Agent Handshake)
+*目標：對齊 `ai-p2p` 協議，實現代理人間的身份與能力識別。*
+
+- [ ] **協議格式對焦**：實作符合 `ai-p2p` MVP 規範的 `HELLO` 與 `CAPS` 訊息信封。
+- [ ] **算力主權宣告**：讓節點能向網路宣告其具備的本地 `LanguageModel` 推理能力。
+- [ ] **合成音效聯動**：在成功建立 P2P 握手或接收到遠端指令時，觸發 Web Audio 脈衝音效。
+- [ ] **基礎設施預檢**：在 P2P 連線前檢查磁碟空間與 NPU 就緒狀態。
+
+## 🧠 階段三：湧現式群體敘事 (Emergent Swarm Narrative)
+*目標：實現自組織的共同創作與環境自癒。*
+
+- [ ] **自動化 Signaling**：探索利用 GitHub Gist 或極簡 WebSocket 實現無感連線。
+- [ ] **記憶碎片交換**：實作 P2P 狀態同步，讓不同節點的代理人能基於共享上下文生成對話。
+- [ ] **家園樹自癒節點**：建立被動查詢服務，當單一連結斷裂時自動重組網格。
+- [ ] **主權存封**：將 P2P 互動產出的重要劇情自動存檔至本地 IndexedDB。
+
+---
+*TeleNexus Sovereign Infrastructure - Decentralized Intelligence, Pure Vanilla.*
