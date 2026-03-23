@@ -14,7 +14,10 @@ class GhostEngine {
             choices: document.getElementById('choice-overlay'),
             textBox: document.getElementById('text-box'),
             flyContainer: document.getElementById('fly-input-container'),
-            flyInput: document.getElementById('fly-input')
+            flyInput: document.getElementById('fly-input'),
+            p2pStatus: document.getElementById('p2p-status'),
+            p2pSignalOut: document.getElementById('p2p-signal-out'),
+            p2pSignalIn: document.getElementById('p2p-signal-in')
         };
         this.scenario = {};
         this.currentId = 'start';
@@ -31,7 +34,7 @@ class GhostEngine {
         this.scenario = await res.json();
         
         this.nodes.textBox.onclick = () => {
-            this.initAudio(); // 透過使用者互動初始化音訊上下文
+            this.initAudio(); 
             this.next();
         };
         
@@ -42,7 +45,16 @@ class GhostEngine {
             }
         };
 
+        this.p2p = new P2PProbe(this);
         this.render();
+    }
+
+    updateP2PStatus(state) {
+        const colors = { disconnected: '#666', connecting: '#ffcc00', connected: '#00f3ff' };
+        if (this.nodes.p2pStatus) {
+            this.nodes.p2pStatus.style.background = colors[state] || '#666';
+            this.nodes.p2pStatus.style.boxShadow = `0 0 10px ${colors[state] || '#666'}`;
+        }
     }
 
     initAudio() {
@@ -143,20 +155,93 @@ class GhostEngine {
         this.nodes.flyContainer.style.display = 'none';
         this.nodes.body.style.opacity = "0.5";
         this.updateActor('glitch');
+try {
+    const result = await this.aiSession.prompt(input);
+    this.nodes.body.style.opacity = "1";
+    this.updateActor('stable');
+    this.typewrite(result, () => {
+        this.playPulseSound();
+        this.p2p.send(result); // 將 AI 的回應發送到 P2P 網格
+    }); 
 
-        try {
-            const result = await this.aiSession.prompt(input);
-            this.nodes.body.style.opacity = "1";
-            this.updateActor('stable');
-            this.typewrite(result, () => this.playPulseSound()); // 推理完畢播放音效
-            
-            setTimeout(() => {
-                if (!this.isFlyMode) return;
-                this.nodes.flyContainer.style.display = 'block';
-                this.nodes.flyInput.focus();
-            }, 500);
-        } catch (e) {
-            this.typewrite("推理崩潰... 網格穩定性下降。");
+    setTimeout(() => {
+        if (!this.isFlyMode) return;
+        this.nodes.flyContainer.style.display = 'block';
+        this.nodes.flyInput.focus();
+    }, 500);
+} catch (e) {
+...
+const engine = new GhostEngine();
+
+class P2PProbe {
+constructor(engine) {
+this.engine = engine;
+this.pc = null;
+this.dc = null;
+this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+}
+
+initPC() {
+this.pc = new RTCPeerConnection(this.config);
+this.pc.onicecandidate = (e) => {
+    if (e.candidate) return;
+    this.engine.nodes.p2pSignalOut.value = btoa(JSON.stringify(this.pc.localDescription));
+};
+this.pc.onconnectionstatechange = () => {
+    this.engine.updateP2PStatus(this.pc.connectionState === 'connected' ? 'connected' : 'connecting');
+};
+}
+
+async createOffer() {
+this.initPC();
+this.dc = this.pc.createDataChannel('ghost-chat');
+this.setupDataChannel();
+const offer = await this.pc.createOffer();
+await this.pc.setLocalDescription(offer);
+}
+
+async handleSignal() {
+const input = this.engine.nodes.p2pSignalIn.value.trim();
+if (!input) return;
+
+try {
+    const signal = JSON.parse(atob(input));
+    if (!this.pc) this.initPC();
+
+    if (signal.type === 'offer') {
+        await this.pc.setRemoteDescription(signal);
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        this.pc.ondatachannel = (e) => {
+            this.dc = e.channel;
+            this.setupDataChannel();
+        };
+    } else if (signal.type === 'answer') {
+        await this.pc.setRemoteDescription(signal);
+    }
+} catch (e) {
+    this.engine.typewrite("[系統]: 訊號解碼失敗，因果連結崩潰。");
+}
+}
+
+setupDataChannel() {
+if (!this.dc) return;
+this.dc.onopen = () => {
+    console.log("[P2P] Channel Open");
+    this.engine.updateP2PStatus('connected');
+};
+this.dc.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    this.engine.typewrite(`[遠端殘響]: ${data.text}`);
+};
+}
+
+send(text) {
+if (this.dc && this.dc.readyState === 'open') {
+    this.dc.send(JSON.stringify({ text }));
+}
+}
+}
             console.error(e);
         }
     }

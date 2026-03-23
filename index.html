@@ -28,6 +28,21 @@
         <div id="meta-menu">
             <button onclick="toggleTheme()">🌓 Toggle Logic/Soul</button>
             <button onclick="saveGame()">💾 Log Memory</button>
+            <button onclick="document.getElementById('p2p-panel').style.display='block'">📡 P2P Probe</button>
+        </div>
+
+        <div id="p2p-panel" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:var(--bg); border:2px solid var(--primary); padding:30px; border-radius:15px; z-index:1000; width:80%; max-width:500px; box-shadow:0 0 50px rgba(0,0,0,0.8);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0; color:var(--primary); font-family:var(--font-mono);">[ P2P PROBE V1 ]</h3>
+                <div id="p2p-status" style="width:12px; height:12px; background:#666; border-radius:50%; box-shadow:0 0 10px #666;"></div>
+                <button onclick="this.parentElement.parentElement.style.display='none'" style="background:none; border:none; color:var(--text); cursor:pointer;">✕</button>
+            </div>
+            
+            <textarea id="p2p-signal-out" readonly placeholder="本地訊號 (Offer/Answer) 將在此生成..." style="width:100%; height:80px; background:var(--surface); color:var(--text); border:1px solid #333; padding:10px; font-size:10px; margin-bottom:10px; border-radius:5px; resize:none;"></textarea>
+            <button onclick="engine.p2p.createOffer()" style="width:100%; padding:10px; background:var(--primary); color:#000; border:none; border-radius:5px; font-weight:800; cursor:pointer; margin-bottom:20px;">GENERATE OFFER</button>
+            
+            <textarea id="p2p-signal-in" placeholder="在此貼上遠端訊號以建立因果連結..." style="width:100%; height:80px; background:var(--surface); color:var(--text); border:1px solid #333; padding:10px; font-size:10px; margin-bottom:10px; border-radius:5px; resize:none;"></textarea>
+            <button onclick="engine.p2p.handleSignal()" style="width:100%; padding:10px; background:var(--accent); color:#fff; border:none; border-radius:5px; font-weight:800; cursor:pointer;">CONNECT CAUSAL LINK</button>
         </div>
     </div>
     <script src="game.js"></script>
