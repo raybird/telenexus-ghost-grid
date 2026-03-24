@@ -62,7 +62,8 @@ class P2PProbe {
         };
         this.dc.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            this.engine.typewrite(`[遠端殘響]: ${data.text}`);
+            const safeText = this.engine.sanitize(data.text);
+            this.engine.typewrite(`[遠端殘響]: ${safeText}`);
         };
     }
 
@@ -163,6 +164,12 @@ class GhostEngine {
                 console.error("[GhostEngine] Prompt API 呼叫失敗:", e);
             }
         }
+    }
+
+    sanitize(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     render() {
