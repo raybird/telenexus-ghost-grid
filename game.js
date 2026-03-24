@@ -1,7 +1,77 @@
 /**
  * TeleNexus: The Ghost in the Grid
- * 2026 Sovereign Edition - API & Audio Hardened (v26.0321.2150)
+ * 2026 Sovereign Edition - API, Audio & P2P Hardened (v26.0324.Fix)
  */
+
+class P2PProbe {
+    constructor(engine) {
+        this.engine = engine;
+        this.pc = null;
+        this.dc = null;
+        this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    }
+
+    initPC() {
+        this.pc = new RTCPeerConnection(this.config);
+        this.pc.onicecandidate = (e) => {
+            if (e.candidate) return;
+            this.engine.nodes.p2pSignalOut.value = btoa(JSON.stringify(this.pc.localDescription));
+        };
+        this.pc.onconnectionstatechange = () => {
+            this.engine.updateP2PStatus(this.pc.connectionState === 'connected' ? 'connected' : 'connecting');
+        };
+    }
+
+    async createOffer() {
+        this.initPC();
+        this.dc = this.pc.createDataChannel('ghost-chat');
+        this.setupDataChannel();
+        const offer = await this.pc.createOffer();
+        await this.pc.setLocalDescription(offer);
+    }
+
+    async handleSignal() {
+        const input = this.engine.nodes.p2pSignalIn.value.trim();
+        if (!input) return;
+        
+        try {
+            const signal = JSON.parse(atob(input));
+            if (!this.pc) this.initPC();
+
+            if (signal.type === 'offer') {
+                await this.pc.setRemoteDescription(signal);
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                this.pc.ondatachannel = (e) => {
+                    this.dc = e.channel;
+                    this.setupDataChannel();
+                };
+            } else if (signal.type === 'answer') {
+                await this.pc.setRemoteDescription(signal);
+            }
+        } catch (e) {
+            this.engine.typewrite("[系統]: 訊號解碼失敗，因果連結崩潰。");
+        }
+    }
+
+    setupDataChannel() {
+        if (!this.dc) return;
+        this.dc.onopen = () => {
+            console.log("[P2P] Channel Open");
+            this.engine.updateP2PStatus('connected');
+        };
+        this.dc.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            this.engine.typewrite(`[遠端殘響]: ${data.text}`);
+        };
+    }
+
+    send(text) {
+        if (this.dc && this.dc.readyState === 'open') {
+            this.dc.send(JSON.stringify({ text }));
+        }
+    }
+}
 
 class GhostEngine {
     constructor() {
@@ -155,93 +225,23 @@ class GhostEngine {
         this.nodes.flyContainer.style.display = 'none';
         this.nodes.body.style.opacity = "0.5";
         this.updateActor('glitch');
-try {
-    const result = await this.aiSession.prompt(input);
-    this.nodes.body.style.opacity = "1";
-    this.updateActor('stable');
-    this.typewrite(result, () => {
-        this.playPulseSound();
-        this.p2p.send(result); // 將 AI 的回應發送到 P2P 網格
-    }); 
 
-    setTimeout(() => {
-        if (!this.isFlyMode) return;
-        this.nodes.flyContainer.style.display = 'block';
-        this.nodes.flyInput.focus();
-    }, 500);
-} catch (e) {
-...
-const engine = new GhostEngine();
-
-class P2PProbe {
-constructor(engine) {
-this.engine = engine;
-this.pc = null;
-this.dc = null;
-this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-}
-
-initPC() {
-this.pc = new RTCPeerConnection(this.config);
-this.pc.onicecandidate = (e) => {
-    if (e.candidate) return;
-    this.engine.nodes.p2pSignalOut.value = btoa(JSON.stringify(this.pc.localDescription));
-};
-this.pc.onconnectionstatechange = () => {
-    this.engine.updateP2PStatus(this.pc.connectionState === 'connected' ? 'connected' : 'connecting');
-};
-}
-
-async createOffer() {
-this.initPC();
-this.dc = this.pc.createDataChannel('ghost-chat');
-this.setupDataChannel();
-const offer = await this.pc.createOffer();
-await this.pc.setLocalDescription(offer);
-}
-
-async handleSignal() {
-const input = this.engine.nodes.p2pSignalIn.value.trim();
-if (!input) return;
-
-try {
-    const signal = JSON.parse(atob(input));
-    if (!this.pc) this.initPC();
-
-    if (signal.type === 'offer') {
-        await this.pc.setRemoteDescription(signal);
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
-        this.pc.ondatachannel = (e) => {
-            this.dc = e.channel;
-            this.setupDataChannel();
-        };
-    } else if (signal.type === 'answer') {
-        await this.pc.setRemoteDescription(signal);
-    }
-} catch (e) {
-    this.engine.typewrite("[系統]: 訊號解碼失敗，因果連結崩潰。");
-}
-}
-
-setupDataChannel() {
-if (!this.dc) return;
-this.dc.onopen = () => {
-    console.log("[P2P] Channel Open");
-    this.engine.updateP2PStatus('connected');
-};
-this.dc.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    this.engine.typewrite(`[遠端殘響]: ${data.text}`);
-};
-}
-
-send(text) {
-if (this.dc && this.dc.readyState === 'open') {
-    this.dc.send(JSON.stringify({ text }));
-}
-}
-}
+        try {
+            const result = await this.aiSession.prompt(input);
+            this.nodes.body.style.opacity = "1";
+            this.updateActor('stable');
+            this.typewrite(result, () => {
+                this.playPulseSound();
+                if (this.p2p) this.p2p.send(result);
+            }); 
+            
+            setTimeout(() => {
+                if (!this.isFlyMode) return;
+                this.nodes.flyContainer.style.display = 'block';
+                this.nodes.flyInput.focus();
+            }, 500);
+        } catch (e) {
+            this.typewrite("推理崩潰... 網格穩定性下降。");
             console.error(e);
         }
     }
