@@ -1,6 +1,6 @@
 /**
  * TeleNexus: The Ghost in the Grid
- * 2026 Sovereign Edition - API, Audio & P2P Hardened (v26.0324.Fix)
+ * 2026 Sovereign Edition - API, Audio & P2P Hardened (v26.0325.Handshake)
  */
 
 class P2PProbe {
@@ -8,6 +8,7 @@ class P2PProbe {
         this.engine = engine;
         this.pc = null;
         this.dc = null;
+        this.agentId = `agent-${crypto.randomUUID().substring(0, 8)}`;
         this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     }
 
@@ -59,17 +60,41 @@ class P2PProbe {
         this.dc.onopen = () => {
             console.log("[P2P] Channel Open");
             this.engine.updateP2PStatus('connected');
+            this.sendHandshake();
         };
         this.dc.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            const safeText = this.engine.sanitize(data.text);
-            this.engine.typewrite(`[遠端殘響]: ${safeText}`);
+            if (data.type === 'HELLO') {
+                this.handleHandshake(data);
+            } else {
+                const safeText = this.engine.sanitize(data.text);
+                this.engine.typewrite(`[遠端殘響]: ${safeText}`);
+            }
         };
+    }
+
+    sendHandshake() {
+        const handshake = {
+            type: 'HELLO',
+            agentId: this.agentId,
+            capabilities: {
+                ai: typeof LanguageModel !== 'undefined',
+                audio: typeof AudioContext !== 'undefined',
+                timestamp: new Date().toISOString()
+            }
+        };
+        this.dc.send(JSON.stringify(handshake));
+    }
+
+    handleHandshake(data) {
+        console.log(`[P2P] 收到握手自 ${data.agentId}:`, data.capabilities);
+        this.engine.playPulseSound();
+        this.engine.typewrite(`[系統]: 已連結至主權節點 ${data.agentId}。算力就緒：${data.capabilities.ai}`);
     }
 
     send(text) {
         if (this.dc && this.dc.readyState === 'open') {
-            this.dc.send(JSON.stringify({ text }));
+            this.dc.send(JSON.stringify({ type: 'MESSAGE', text }));
         }
     }
 }
