@@ -125,15 +125,40 @@ class GhostEngine {
         this.init();
     }
 
+    async checkInfrastructure() {
+        this.typewrite("[系統]: 啟動階段二基礎設施預檢...");
+
+        const infra = {
+            storage: '未知',
+            ai: typeof LanguageModel !== 'undefined' ? 'NPU 就緒' : 'CPU 模擬',
+            audio: typeof AudioContext !== 'undefined' || (window.AudioContext || window.webkitAudioContext) ? '聲學就緒' : '靜音模式'
+        };
+
+        try {
+            if (navigator.storage && navigator.storage.estimate) {
+                const estimate = await navigator.storage.estimate();
+                const freeGB = (estimate.quota - estimate.usage) / (1024 * 1024 * 1024);
+                infra.storage = `${freeGB.toFixed(1)} GB 可用`;
+                if (freeGB < 22) {
+                    this.typewrite("[警告]: 磁碟空間低於 Gemini Nano 門檻 (22GB)。");
+                }
+            }
+        } catch (e) {
+            console.warn("Storage API unavailable");
+        }
+
+        this.typewrite(`[預檢結果]: 存儲: ${infra.storage} | 算力: ${infra.ai} | 音訊: ${infra.audio}`);
+    }
+
     async init() {
         const res = await fetch('scenario.json');
         this.scenario = await res.json();
-        
+
         this.nodes.textBox.onclick = () => {
-            this.initAudio(); 
+            this.initAudio();
             this.next();
         };
-        
+
         this.nodes.flyInput.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 this.initAudio();
@@ -142,9 +167,9 @@ class GhostEngine {
         };
 
         this.p2p = new P2PProbe(this);
+        await this.checkInfrastructure();
         this.render();
     }
-
     updateP2PStatus(state) {
         const colors = { disconnected: '#666', connecting: '#ffcc00', connected: '#00f3ff' };
         if (this.nodes.p2pStatus) {
