@@ -3,6 +3,49 @@
  * 2026 Sovereign Edition - API, Audio & P2P Hardened (v26.0325.Handshake)
  */
 
+/**
+ * SovereignArchive: 本地主權存封 (IndexedDB)
+ * 負責將 P2P 互動與因果紀錄存封至瀏覽器本地。
+ */
+class SovereignArchive {
+    constructor() {
+        this.dbName = 'GhostGridArchive';
+        this.db = null;
+    }
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, 1);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('logs')) {
+                    db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
+                }
+            };
+            request.onsuccess = (e) => {
+                this.db = e.target.result;
+                resolve();
+            };
+            request.onerror = (e) => reject(e);
+        });
+    }
+
+    async log(type, content) {
+        if (!this.db) return;
+        return new Promise((resolve) => {
+            const transaction = this.db.transaction(['logs'], 'readwrite');
+            const store = transaction.objectStore('logs');
+            store.add({
+                type,
+                content,
+                timestamp: new Date().toISOString(),
+                version: 'v26.0327'
+            });
+            transaction.oncomplete = () => resolve();
+        });
+    }
+}
+
 class P2PProbe {
     constructor(engine) {
         this.engine = engine;
@@ -167,7 +210,10 @@ class GhostEngine {
         };
 
         this.p2p = new P2PProbe(this);
+        this.archive = new SovereignArchive();
+        await this.archive.init();
         await this.checkInfrastructure();
+        await this.archive.log('SYSTEM', 'Ghost Grid Initialized (Sovereign Archiving Ready)');
         this.render();
     }
     updateP2PStatus(state) {

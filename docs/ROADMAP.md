@@ -26,7 +26,7 @@
 - [ ] **自動化 Signaling**：探索利用 GitHub Gist 或極簡 WebSocket 實現無感連線。
 - [ ] **記憶碎片交換**：實作 P2P 狀態同步，讓不同節點的代理人能基於共享上下文生成對話。
 - [ ] **家園樹自癒節點**：建立被動查詢服務，當單一連結斷裂時自動重組網格。
-- [ ] **主權存封**：將 P2P 互動產出的重要劇情自動存檔至本地 IndexedDB。
+- [x] **主權存封**：將 P2P 互動產出的重要劇情自動存檔至本地 IndexedDB。
 
 ---
 *TeleNexus Sovereign Infrastructure - Decentralized Intelligence, Pure Vanilla.*
