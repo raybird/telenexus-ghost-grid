@@ -81,11 +81,72 @@ class MemoryExchanger {
     }
 }
 
+/**
+ * GistSignaler: 基於 GitHub Gist 的無感握手伺服器
+ * 負責在公有雲端建立臨時的因果信箱，交換 WebRTC 訊號。
+ */
+class GistSignaler {
+    constructor() {
+        this.token = localStorage.getItem('GHOST_GRID_PAT');
+        this.baseUrl = "https://api.github.com/gists";
+        this.gridId = "TeleNexus-Ghost-Grid-Alpha";
+    }
+
+    setToken(token) {
+        this.token = token;
+        localStorage.setItem('GHOST_GRID_PAT', token);
+    }
+
+    async createSignal(offer) {
+        const payload = {
+            description: `SIGNALING_${this.gridId}`,
+            public: false,
+            files: { "signal.json": { content: JSON.stringify({ offer, status: "pending", timestamp: Date.now() }) } }
+        };
+        const res = await fetch(this.baseUrl, {
+            method: "POST",
+            headers: { "Authorization": `token ${this.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        return await res.json();
+    }
+
+    async findSignals() {
+        const res = await fetch(this.baseUrl, {
+            headers: { "Authorization": `token ${this.token}` }
+        });
+        const gists = await res.json();
+        return gists.filter(g => g.description === `SIGNALING_${this.gridId}`);
+    }
+
+    async replyToSignal(gistId, answer) {
+        const res = await fetch(`${this.baseUrl}/${gistId}`);
+        const data = await res.json();
+        const content = JSON.parse(data.files["signal.json"].content);
+        const update = {
+            files: { "signal.json": { content: JSON.stringify({ ...content, answer, status: "connected" }) } }
+        };
+        await fetch(`${this.baseUrl}/${gistId}`, {
+            method: "PATCH",
+            headers: { "Authorization": `token ${this.token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(update)
+        });
+    }
+
+    async checkAnswer(gistId) {
+        const res = await fetch(`${this.baseUrl}/${gistId}`);
+        const data = await res.json();
+        const content = JSON.parse(data.files["signal.json"].content);
+        return content.answer || null;
+    }
+}
+
 class P2PProbe {
     constructor(engine) {
         this.engine = engine;
         this.pc = null;
         this.dc = null;
+        this.signaler = new GistSignaler();
         this.agentId = `agent-${crypto.randomUUID().substring(0, 8)}`;
         this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     }
@@ -99,6 +160,54 @@ class P2PProbe {
         this.pc.onconnectionstatechange = () => {
             this.engine.updateP2PStatus(this.pc.connectionState === 'connected' ? 'connected' : 'connecting');
         };
+    }
+
+    async startAutomatedHost() {
+        this.engine.typewrite("[系統]: 正在全球網格建立存取點...");
+        await this.createOffer();
+        // 等待 ICE Gathering 完成
+        setTimeout(async () => {
+            const offer = btoa(JSON.stringify(this.pc.localDescription));
+            const gist = await this.signaler.createSignal(offer);
+            this.engine.typewrite(`[系統]: 存取點已建立。等待遠端因果坍縮...`);
+            
+            // 輪詢 Answer
+            const interval = setInterval(async () => {
+                const answer = await this.signaler.checkAnswer(gist.id);
+                if (answer) {
+                    clearInterval(interval);
+                    const signal = JSON.parse(atob(answer));
+                    await this.pc.setRemoteDescription(signal);
+                    this.engine.typewrite(`[系統]: 偵測到遠端響應，網格連結達成。`);
+                }
+            }, 3000);
+        }, 2000);
+    }
+
+    async joinAutomatedGrid() {
+        this.engine.typewrite("[系統]: 正在掃描全球網格訊號...");
+        const signals = await this.signaler.findSignals();
+        if (signals.length === 0) {
+            this.engine.typewrite("[系統]: 未發現活躍網格。");
+            return;
+        }
+        
+        const target = signals[0];
+        const content = JSON.parse(target.files["signal.json"].content);
+        const offer = JSON.parse(atob(content.offer));
+        
+        if (!this.pc) this.initPC();
+        await this.pc.setRemoteDescription(offer);
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        
+        this.pc.ondatachannel = (e) => {
+            this.dc = e.channel;
+            this.setupDataChannel();
+        };
+
+        await this.signaler.replyToSignal(target.id, btoa(JSON.stringify(answer)));
+        this.engine.typewrite(`[系統]: 已向網格發送因果響應。`);
     }
 
     async createOffer() {
@@ -366,6 +475,23 @@ class GhostEngine {
         if (!input || this.isTyping) return;
 
         this.nodes.flyInput.value = "";
+        
+        // 捕捉特定網格指令
+        if (input.startsWith('/auth ')) {
+            const token = input.split(' ')[1];
+            this.p2p.signaler.setToken(token);
+            this.typewrite("[系統]: GitHub 憑證已更新並存儲於本地。");
+            return;
+        }
+        if (input === '/host') {
+            await this.p2p.startAutomatedHost();
+            return;
+        }
+        if (input === '/join') {
+            await this.p2p.joinAutomatedGrid();
+            return;
+        }
+
         this.nodes.flyContainer.style.display = 'none';
         this.nodes.body.style.opacity = "0.5";
         this.updateActor('glitch');
