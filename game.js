@@ -46,6 +46,41 @@ class SovereignArchive {
     }
 }
 
+/**
+ * MemoryExchanger: 記憶碎片交換 (P2P Memory Sync)
+ * 負責同步不同節點間的因果指紋，實現跨 Session 演化連續性。
+ */
+class MemoryExchanger {
+    constructor(engine) {
+        this.engine = engine;
+    }
+
+    async getLocalFragments() {
+        if (!this.engine.archive.db) return [];
+        return new Promise((resolve) => {
+            const transaction = this.engine.archive.db.transaction(['logs'], 'readonly');
+            const store = transaction.objectStore('logs');
+            const request = store.getAll(null, 5); // 僅同步最近 5 條指紋
+            request.onsuccess = () => {
+                const fingerprints = request.result.map(log => ({
+                    id: log.id,
+                    timestamp: log.timestamp,
+                    type: log.type
+                }));
+                resolve(fingerprints);
+            };
+        });
+    }
+
+    async syncWithPeer(fragments) {
+        this.engine.typewrite(`[系統]: 正在校準遠端記憶碎片 (${fragments.length} 條)...`);
+        fragments.forEach(f => {
+            console.log(`[Sync] 接收到遠端因果: ${f.type} @ ${f.timestamp}`);
+        });
+        await this.engine.archive.log('SYNC', `Merged ${fragments.length} remote fragments.`);
+    }
+}
+
 class P2PProbe {
     constructor(engine) {
         this.engine = engine;
@@ -116,13 +151,15 @@ class P2PProbe {
         };
     }
 
-    sendHandshake() {
+    async sendHandshake() {
+        const fragments = await this.engine.exchanger.getLocalFragments();
         const handshake = {
             type: 'HELLO',
             agentId: this.agentId,
             capabilities: {
                 ai: typeof LanguageModel !== 'undefined',
                 audio: typeof AudioContext !== 'undefined',
+                fragments: fragments,
                 timestamp: new Date().toISOString()
             }
         };
@@ -132,7 +169,10 @@ class P2PProbe {
     handleHandshake(data) {
         console.log(`[P2P] 收到握手自 ${data.agentId}:`, data.capabilities);
         this.engine.playPulseSound();
-        this.engine.typewrite(`[系統]: 已連結至主權節點 ${data.agentId}。算力就緒：${data.capabilities.ai}`);
+        this.engine.typewrite(`[系統]: 已連結至主權節點 ${data.agentId}。`);
+        if (data.capabilities.fragments) {
+            this.engine.exchanger.syncWithPeer(data.capabilities.fragments);
+        }
     }
 
     send(text) {
@@ -211,9 +251,10 @@ class GhostEngine {
 
         this.p2p = new P2PProbe(this);
         this.archive = new SovereignArchive();
+        this.exchanger = new MemoryExchanger(this);
         await this.archive.init();
         await this.checkInfrastructure();
-        await this.archive.log('SYSTEM', 'Ghost Grid Initialized (Sovereign Archiving Ready)');
+        await this.archive.log('SYSTEM', 'Ghost Grid Initialized (Memory Sync Ready)');
         this.render();
     }
     updateP2PStatus(state) {
