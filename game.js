@@ -74,6 +74,7 @@ class MemoryExchanger {
 
     async syncWithPeer(fragments) {
         this.engine.typewrite(`[系統]: 正在校準遠端記憶碎片 (${fragments.length} 條)...`);
+        this.engine.provenanceUI.render(fragments);
         fragments.forEach(f => {
             console.log(`[Sync] 接收到遠端因果: ${f.type} @ ${f.timestamp}`);
         });
@@ -137,7 +138,43 @@ class GistSignaler {
         const res = await fetch(`${this.baseUrl}/${gistId}`);
         const data = await res.json();
         const content = JSON.parse(data.files["signal.json"].content);
+        
+        if (content.answer) {
+            // 連線達成，執行因果清理 (刪除 Gist)
+            await fetch(`${this.baseUrl}/${gistId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `token ${this.token}` }
+            });
+            console.log(`[Signaler] 因果已坍縮，Gist ${gistId} 已物理銷毀。`);
+        }
         return content.answer || null;
+    }
+}
+
+/**
+ * ProvenanceUI: 因果溯源面板
+ * 負責渲染同步自網格的記憶碎片。
+ */
+class ProvenanceUI {
+    constructor(engine) {
+        this.engine = engine;
+    }
+
+    render(fragments) {
+        const container = document.getElementById('p2p-status');
+        if (!container) return;
+
+        const uiId = 'ghost-provenance-panel';
+        let panel = document.getElementById(uiId);
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = uiId;
+            panel.style = "font-size: 0.7rem; color: #00f3ff; margin-top: 10px; border-top: 1px dashed #333; padding-top: 5px;";
+            container.parentNode.appendChild(panel);
+        }
+
+        panel.innerHTML = `<strong>[ 遠端因果溯源 ]</strong><br>` + 
+            fragments.map(f => `⦿ ${f.type} @ ${new Date(f.timestamp).toLocaleTimeString()}`).join('<br>');
     }
 }
 
@@ -361,9 +398,10 @@ class GhostEngine {
         this.p2p = new P2PProbe(this);
         this.archive = new SovereignArchive();
         this.exchanger = new MemoryExchanger(this);
+        this.provenanceUI = new ProvenanceUI(this);
         await this.archive.init();
         await this.checkInfrastructure();
-        await this.archive.log('SYSTEM', 'Ghost Grid Initialized (Memory Sync Ready)');
+        await this.archive.log('SYSTEM', 'Ghost Grid Initialized (Full Stack Ready)');
         this.render();
     }
     updateP2PStatus(state) {
