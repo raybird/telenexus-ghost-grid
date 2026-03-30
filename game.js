@@ -178,12 +178,38 @@ class ProvenanceUI {
     }
 }
 
+/**
+ * SwarmMonitor: 網格自癒規訓
+ * 負責監控連線狀態，並在偵測到『因果斷裂』時自動觸發重組。
+ */
+class SwarmMonitor {
+    constructor(probe) {
+        this.probe = probe;
+        this.reconnectTimer = null;
+    }
+
+    onConnectionLost() {
+        console.warn("[SwarmMonitor] 偵測到網格斷裂。啟動『家園樹』自癒規訓...");
+        this.probe.engine.typewrite("[警告]: P2P 連結中斷。嘗試自動重組網格...");
+        
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => {
+            this.probe.joinAutomatedGrid(); // 優先嘗試重新加入現有網格
+        }, 5000);
+    }
+
+    clear() {
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    }
+}
+
 class P2PProbe {
     constructor(engine) {
         this.engine = engine;
         this.pc = null;
         this.dc = null;
         this.signaler = new GistSignaler();
+        this.monitor = new SwarmMonitor(this);
         this.agentId = `agent-${crypto.randomUUID().substring(0, 8)}`;
         this.config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     }
@@ -195,7 +221,14 @@ class P2PProbe {
             this.engine.nodes.p2pSignalOut.value = btoa(JSON.stringify(this.pc.localDescription));
         };
         this.pc.onconnectionstatechange = () => {
-            this.engine.updateP2PStatus(this.pc.connectionState === 'connected' ? 'connected' : 'connecting');
+            const state = this.pc.connectionState;
+            this.engine.updateP2PStatus(state === 'connected' ? 'connected' : 'connecting');
+            
+            if (state === 'failed' || state === 'disconnected') {
+                this.monitor.onConnectionLost();
+            } else if (state === 'connected') {
+                this.monitor.clear();
+            }
         };
     }
 
